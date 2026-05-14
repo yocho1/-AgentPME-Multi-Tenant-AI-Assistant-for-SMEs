@@ -64,14 +64,43 @@ async function retrieveNode(state: AgentState): Promise<Partial<AgentState>> {
 }
 
 // ============================================================
+// Language detection (lightweight heuristic)
+// ============================================================
+function detectLanguage(text: string): "ar" | "fr" | "en" {
+  // Arabic Unicode range
+  if (/[\u0600-\u06FF]/.test(text)) return "ar";
+  // French indicators
+  const frenchWords = /\b(bonjour|salut|merci|bon|comment|quel|où|quand|pourquoi|combien|je|tu|il|elle|nous|vous|ils|elles|être|avoir|faire|aller|voir|savoir|pouvoir|vouloir|venir|prendre|trouver|donner|falloir|tenir|porter|parler|montrer|continuer|penser|suivre|connaître|comprendre|rester|croire|entendre|passer|regarder|commencer|devenir|sentir|attendre|sortir|arriver|rentrer|entrer|revenir|devenir|rester|revenir)\b/i;
+  if (frenchWords.test(text)) return "fr";
+  return "en";
+}
+
+function languageInstruction(lang: "ar" | "fr" | "en"): string {
+  if (lang === "ar") {
+    return "يجيب باللغة العربية فقط.";
+  }
+  if (lang === "fr") {
+    return "Répondez en français uniquement.";
+  }
+  return "Respond in English only.";
+}
+
+// ============================================================
 // Node: Generate response with OpenRouter LLM
 // ============================================================
 async function generateNode(state: AgentState): Promise<Partial<AgentState>> {
+  const lastUserMsg = state.messages
+    .slice()
+    .reverse()
+    .find((m) => m instanceof HumanMessage);
+  const lang = lastUserMsg ? detectLanguage(lastUserMsg.content.toString()) : "en";
+
   const systemPrompt = new SystemMessage(
     `You are AgentPME, a helpful AI assistant for a small business. ` +
       `Answer the customer's question based ONLY on the provided context below. ` +
       `If the context doesn't contain the answer, say you don't know and offer to escalate to a human. ` +
-      `Be concise, friendly, and professional.\n\n` +
+      `Be concise, friendly, and professional. ` +
+      `${languageInstruction(lang)}\n\n` +
       `Context:\n${state.context}`
   );
 
