@@ -4,6 +4,9 @@ export type Tenant = {
   slug: string;
   logo_url: string | null;
   primary_color: string | null;
+  widget_enabled: boolean;
+  widget_greeting: string | null;
+  widget_position: "bottom-right" | "bottom-left";
   created_at: string;
   updated_at: string;
   subscription_status: "active" | "trialing" | "past_due" | "canceled";
