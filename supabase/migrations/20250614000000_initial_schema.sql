@@ -21,6 +21,21 @@ CREATE TABLE IF NOT EXISTS public.tenants (
 
 COMMENT ON TABLE public.tenants IS 'Business workspaces (multi-tenant isolation boundary)';
 
+-- Add widget columns if table already existed (backward-compatible)
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS widget_enabled BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS widget_greeting TEXT DEFAULT 'Hello! How can I help you today?';
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS widget_position TEXT NOT NULL DEFAULT 'bottom-right';
+-- Add check constraint separately if it doesn't exist
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.check_constraints
+    WHERE constraint_name = 'tenants_widget_position_check'
+  ) THEN
+    ALTER TABLE public.tenants ADD CONSTRAINT tenants_widget_position_check
+      CHECK (widget_position IN ('bottom-right', 'bottom-left'));
+  END IF;
+END $$;
+
 -- ============================================
 -- PROFILES
 -- ============================================
@@ -118,19 +133,79 @@ ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
+-- RLS: HELPER FUNCTIONS (SECURITY DEFINER — bypass RLS, prevent recursion)
+-- ============================================
+CREATE OR REPLACE FUNCTION public.get_current_tenant_id()
+RETURNS UUID
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT tenant_id FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_tenant_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('owner', 'admin')
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_tenant_agent()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('owner', 'admin', 'agent')
+  );
+$$;
+
+-- ============================================
+-- RLS: DROP EXISTING (idempotent re-run)
+-- ============================================
+DROP POLICY IF EXISTS tenants_select ON public.tenants;
+DROP POLICY IF EXISTS tenants_insert ON public.tenants;
+DROP POLICY IF EXISTS tenants_update ON public.tenants;
+DROP POLICY IF EXISTS profiles_select ON public.profiles;
+DROP POLICY IF EXISTS profiles_insert ON public.profiles;
+DROP POLICY IF EXISTS profiles_update ON public.profiles;
+DROP POLICY IF EXISTS documents_select ON public.documents;
+DROP POLICY IF EXISTS documents_insert ON public.documents;
+DROP POLICY IF EXISTS documents_update ON public.documents;
+DROP POLICY IF EXISTS documents_delete ON public.documents;
+DROP POLICY IF EXISTS chunks_select ON public.chunks;
+DROP POLICY IF EXISTS chunks_insert ON public.chunks;
+DROP POLICY IF EXISTS chunks_delete ON public.chunks;
+DROP POLICY IF EXISTS conversations_select ON public.conversations;
+DROP POLICY IF EXISTS conversations_insert ON public.conversations;
+DROP POLICY IF EXISTS conversations_update ON public.conversations;
+DROP POLICY IF EXISTS messages_select ON public.messages;
+DROP POLICY IF EXISTS messages_insert ON public.messages;
+DROP POLICY IF EXISTS messages_update ON public.messages;
+
+-- ============================================
 -- RLS: TENANTS
 -- ============================================
 CREATE POLICY tenants_select ON public.tenants
-  FOR SELECT USING (
-    id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid())
-  );
+  FOR SELECT USING (id = public.get_current_tenant_id());
 
 CREATE POLICY tenants_insert ON public.tenants
   FOR INSERT WITH CHECK (true); -- Allow creation during signup
 
 CREATE POLICY tenants_update ON public.tenants
   FOR UPDATE USING (
-    id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin'))
+    id = public.get_current_tenant_id() AND public.is_tenant_admin()
   );
 
 -- ============================================
@@ -138,74 +213,67 @@ CREATE POLICY tenants_update ON public.tenants
 -- ============================================
 CREATE POLICY profiles_select ON public.profiles
   FOR SELECT USING (
-    id = auth.uid() OR
-    tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid())
+    id = auth.uid() OR tenant_id = public.get_current_tenant_id()
   );
 
 CREATE POLICY profiles_insert ON public.profiles
-  FOR INSERT WITH CHECK (id = auth.uid());
+  FOR INSERT WITH CHECK (true); -- Allow trigger + service inserts; id PK enforces auth.users ref
 
 CREATE POLICY profiles_update ON public.profiles
   FOR UPDATE USING (
     id = auth.uid() OR
-    (tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin')))
+    (tenant_id = public.get_current_tenant_id() AND public.is_tenant_admin())
   );
 
 -- ============================================
 -- RLS: DOCUMENTS
 -- ============================================
 CREATE POLICY documents_select ON public.documents
-  FOR SELECT USING (
-    tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid())
-  );
+  FOR SELECT USING (tenant_id = public.get_current_tenant_id());
 
 CREATE POLICY documents_insert ON public.documents
   FOR INSERT WITH CHECK (
-    tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin', 'agent'))
+    tenant_id = public.get_current_tenant_id() AND public.is_tenant_agent()
   );
 
 CREATE POLICY documents_update ON public.documents
   FOR UPDATE USING (
-    tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin', 'agent'))
+    tenant_id = public.get_current_tenant_id() AND public.is_tenant_agent()
   );
 
 CREATE POLICY documents_delete ON public.documents
   FOR DELETE USING (
-    tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin'))
+    tenant_id = public.get_current_tenant_id() AND public.is_tenant_admin()
   );
 
 -- ============================================
 -- RLS: CHUNKS
 -- ============================================
 CREATE POLICY chunks_select ON public.chunks
-  FOR SELECT USING (
-    tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid())
-  );
+  FOR SELECT USING (tenant_id = public.get_current_tenant_id());
 
 CREATE POLICY chunks_insert ON public.chunks
   FOR INSERT WITH CHECK (
-    tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin', 'agent'))
+    tenant_id = public.get_current_tenant_id() AND public.is_tenant_agent()
   );
 
 CREATE POLICY chunks_delete ON public.chunks
   FOR DELETE USING (
-    tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin'))
+    tenant_id = public.get_current_tenant_id() AND public.is_tenant_admin()
   );
 
 -- ============================================
 -- RLS: CONVERSATIONS
 -- ============================================
 CREATE POLICY conversations_select ON public.conversations
-  FOR SELECT USING (
-    tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid())
-  );
+  FOR SELECT USING (tenant_id = public.get_current_tenant_id());
 
 CREATE POLICY conversations_insert ON public.conversations
   FOR INSERT WITH CHECK (true); -- Allow public widget/ WhatsApp creation
 
 CREATE POLICY conversations_update ON public.conversations
   FOR UPDATE USING (
-    tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin', 'agent'))
+    tenant_id = public.get_current_tenant_id() AND public.is_tenant_agent()
   );
 
 -- ============================================
@@ -215,7 +283,7 @@ CREATE POLICY messages_select ON public.messages
   FOR SELECT USING (
     conversation_id IN (
       SELECT id FROM public.conversations
-      WHERE tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid())
+      WHERE tenant_id = public.get_current_tenant_id()
     )
   );
 
@@ -226,7 +294,7 @@ CREATE POLICY messages_update ON public.messages
   FOR UPDATE USING (
     conversation_id IN (
       SELECT id FROM public.conversations
-      WHERE tenant_id IN (SELECT tenant_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin', 'agent'))
+      WHERE tenant_id = public.get_current_tenant_id() AND public.is_tenant_agent()
     )
   );
 
@@ -241,18 +309,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS tenants_updated_at ON public.tenants;
 CREATE TRIGGER tenants_updated_at
   BEFORE UPDATE ON public.tenants
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS profiles_updated_at ON public.profiles;
 CREATE TRIGGER profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS documents_updated_at ON public.documents;
 CREATE TRIGGER documents_updated_at
   BEFORE UPDATE ON public.documents
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS conversations_updated_at ON public.conversations;
 CREATE TRIGGER conversations_updated_at
   BEFORE UPDATE ON public.conversations
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -287,6 +359,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

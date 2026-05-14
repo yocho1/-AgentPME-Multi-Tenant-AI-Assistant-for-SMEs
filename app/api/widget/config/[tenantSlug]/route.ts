@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * GET /api/widget/config/:tenantSlug
  * Public endpoint: returns widget configuration for embedding.
+ * Uses service role client to bypass RLS (no auth required).
  */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ tenantSlug: string }> }
 ) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { tenantSlug } = await params;
 
   const { data: tenant, error } = await (supabase.from("tenants") as any)

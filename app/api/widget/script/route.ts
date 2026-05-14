@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * GET /api/widget/script?tenant=:slug
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data: tenant } = await (supabase.from("tenants") as any)
     .select("widget_enabled, widget_position")
     .eq("slug", tenantSlug)

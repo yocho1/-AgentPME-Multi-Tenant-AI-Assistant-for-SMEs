@@ -15,10 +15,19 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let { data: profile } = await (supabase.from("profiles") as any)
+  const {
+    data: profileData,
+    error: profileSelectErr,
+  } = await (supabase.from("profiles") as any)
     .select("tenant_id, role")
     .eq("id", user.id)
     .single();
+
+  if (profileSelectErr) {
+    console.error("[tenant/settings] profile select failed:", profileSelectErr);
+  }
+
+  let profile = profileData;
 
   // Auto-create tenant + profile for existing users who signed up
   // before the handle_new_user trigger was installed.
@@ -41,8 +50,9 @@ export async function PATCH(request: Request) {
       .single();
 
     if (tenantErr || !newTenant) {
+      console.error("[tenant/settings] tenant insert failed:", tenantErr);
       return NextResponse.json(
-        { error: "Failed to create tenant: " + tenantErr?.message },
+        { error: "Failed to create tenant: " + (tenantErr?.message || "unknown") },
         { status: 500 }
       );
     }
@@ -58,6 +68,7 @@ export async function PATCH(request: Request) {
       });
 
     if (profileErr) {
+      console.error("[tenant/settings] profile insert failed:", profileErr);
       return NextResponse.json(
         { error: "Failed to create profile: " + profileErr.message },
         { status: 500 }
@@ -114,10 +125,19 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let { data: profile } = await (supabase.from("profiles") as any)
+  const {
+    data: profileData,
+    error: profileSelectErr,
+  } = await (supabase.from("profiles") as any)
     .select("tenant_id")
     .eq("id", user.id)
     .single();
+
+  if (profileSelectErr) {
+    console.error("[tenant/settings] profile select failed:", profileSelectErr);
+  }
+
+  let profile = profileData;
 
   // Auto-create tenant + profile for existing users who signed up
   // before the handle_new_user trigger was installed.
@@ -140,8 +160,9 @@ export async function GET() {
       .single();
 
     if (tenantErr || !newTenant) {
+      console.error("[tenant/settings] tenant insert failed:", tenantErr);
       return NextResponse.json(
-        { error: "Failed to create tenant: " + tenantErr?.message },
+        { error: "Failed to create tenant: " + (tenantErr?.message || "unknown") },
         { status: 500 }
       );
     }
@@ -157,6 +178,7 @@ export async function GET() {
       });
 
     if (profileErr) {
+      console.error("[tenant/settings] profile insert failed:", profileErr);
       return NextResponse.json(
         { error: "Failed to create profile: " + profileErr.message },
         { status: 500 }
@@ -181,6 +203,7 @@ export async function GET() {
     .single();
 
   if (error || !data) {
+    console.error("[tenant/settings] tenant select failed:", error);
     return NextResponse.json(
       { error: error?.message || "Tenant not found" },
       { status: 500 }

@@ -14,22 +14,28 @@ interface AgentState {
 }
 
 // ============================================================
-// OpenRouter LLM (OpenAI-compatible)
-// Default free model: meta-llama/llama-3.1-8b-instruct:free
+// Lazy LLM factory — creates a fresh instance per request
+// so env vars are read at runtime, not cached at import time.
 // ============================================================
-const model = new ChatOpenAI({
-  model: process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free",
-  temperature: 0.3,
-  openAIApiKey: process.env.OPENROUTER_API_KEY,
-  configuration: {
-    baseURL: "https://openrouter.ai/api/v1",
-    defaultHeaders: {
-      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      "X-Title": "AgentPME",
+function getModel() {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing OPENROUTER_API_KEY environment variable");
+  }
+  return new ChatOpenAI({
+    model: process.env.OPENROUTER_MODEL || "openai/gpt-3.5-turbo",
+    temperature: 0.3,
+    openAIApiKey: apiKey,
+    configuration: {
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        "X-Title": "AgentPME",
+      },
     },
-  },
-  maxTokens: 1024,
-});
+    maxTokens: 1024,
+  });
+}
 
 // ============================================================
 // Node: Retrieve relevant chunks from knowledge base
@@ -67,6 +73,7 @@ async function generateNode(state: AgentState): Promise<Partial<AgentState>> {
       `Context:\n${state.context}`
   );
 
+  const model = getModel();
   const response = await model.invoke([systemPrompt, ...state.messages]);
   return { messages: [...state.messages, response] };
 }
@@ -107,10 +114,6 @@ export async function runAgent(
   tenantId: string,
   messages: { role: "user" | "assistant" | "system"; content: string }[]
 ): Promise<string> {
-  if (!process.env.OPENROUTER_API_KEY) {
-    throw new Error("Missing OPENROUTER_API_KEY environment variable");
-  }
-
   const baseMessages: BaseMessage[] = messages.map((m) => {
     if (m.role === "user") return new HumanMessage(m.content);
     if (m.role === "assistant") return new AIMessage(m.content);
