@@ -1,12 +1,36 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import {
+  proxyWhatsAppWebhook,
+  checkFastAPIHealth,
+} from "@/lib/fastapi-proxy";
 import { runAgent } from "@/lib/agent";
+
+// Configuration
+const USE_FASTAPI = process.env.NEXTJS_STANDALONE_MODE !== "true";
 
 /**
  * GET /api/whatsapp/webhook
  * Meta WhatsApp verification challenge.
  */
 export async function GET(request: Request) {
+  // Check if FastAPI is available
+  const fastapiHealthy = USE_FASTAPI ? await checkFastAPIHealth() : { healthy: false };
+
+  if (fastapiHealthy.healthy) {
+    // Proxy to FastAPI
+    const { searchParams } = new URL(request.url);
+    const response = await proxyWhatsAppWebhook("GET", searchParams);
+
+    if (response.ok) {
+      const challenge = await response.text();
+      return new NextResponse(challenge, { status: 200 });
+    } else {
+      return NextResponse.json({ error: "Verification failed" }, { status: 403 });
+    }
+  }
+
+  // Fallback: Built-in verification
   const { searchParams } = new URL(request.url);
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
@@ -33,6 +57,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const body = await request.json();
 
+  // Check if FastAPI is available
+  const fastapiHealthy = USE_FASTAPI ? await checkFastAPIHealth() : { healthy: false };
+
+  if (fastapiHealthy.healthy) {
+    // Proxy to FastAPI
+    const response = await proxyWhatsAppWebhook("POST", undefined, body);
+    return NextResponse.json({ status: "proxied_to_fastapi" });
+  }
+
+  // Fallback: Process in Next.js
   // Extract message entry
   const entry = body.entry?.[0];
   const changes = entry?.changes?.[0];

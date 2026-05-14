@@ -1,16 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { runAgent } from "@/lib/agent";
 import { v4 as uuidv4 } from "uuid";
+import {
+  proxyToFastAPI,
+  checkFastAPIHealth,
+} from "@/lib/fastapi-proxy";
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
 }
 
+// Configuration
+const USE_FASTAPI = process.env.NEXTJS_STANDALONE_MODE !== "true";
+
 /**
  * POST /api/chat
  * Process a chat message using the RAG agent.
+ *
+ * Routes to FastAPI if available, otherwise falls back to built-in Next.js agent.
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -20,14 +28,13 @@ export async function POST(request: NextRequest) {
 
   // Allow both authenticated dashboard users and anonymous widget users
   const body = await request.json();
-  const { message, conversationId, tenantId: providedTenantId } = body;
+  const { message, conversationId, tenantId: providedTenantId, stream } = body;
 
   if (!message || typeof message !== "string") {
     return NextResponse.json({ error: "Missing message" }, { status: 400 });
   }
 
   let tenantId: string;
-  let conversation_id: string;
 
   if (user) {
     // Authenticated user from dashboard
@@ -49,6 +56,60 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Check if FastAPI is available
+  const fastapiHealthy = USE_FASTAPI ? await checkFastAPIHealth() : { healthy: false };
+
+  if (fastapiHealthy.healthy) {
+    // Route to FastAPI
+    console.log("[chat] Routing to FastAPI backend");
+
+    const endpoint = stream ? "/chat/stream" : "/chat/";
+
+    const response = await proxyToFastAPI(endpoint, {
+      method: "POST",
+      body: {
+        message,
+        conversation_id: conversationId,
+        tenant_id: tenantId,
+        channel: "widget",
+        stream: stream || false,
+      },
+      tenantId,
+    });
+
+    // For streaming, return the response directly
+    if (stream && response.ok) {
+      return new NextResponse(response.body, {
+        status: response.status,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
+    }
+
+    // For non-streaming, parse and return JSON
+    if (response.ok) {
+      const data = await response.json();
+      return NextResponse.json(data);
+    } else {
+      const error = await response.text();
+      return NextResponse.json(
+        { error: "FastAPI error", detail: error },
+        { status: response.status }
+      );
+    }
+  }
+
+  // Fallback: Use built-in Next.js agent (legacy mode)
+  console.log("[chat] Using built-in Next.js agent (FastAPI unavailable)");
+
+  // Import agent only when needed (lazy load)
+  const { runAgent } = await import("@/lib/agent");
+
+  let conversation_id: string;
 
   // Get or create conversation
   if (conversationId) {
