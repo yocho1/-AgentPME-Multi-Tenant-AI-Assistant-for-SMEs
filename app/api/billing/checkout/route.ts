@@ -16,13 +16,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: profile } = await (supabase.from("profiles") as any)
+  const { data: profile, error: profileErr } = await (supabase.from("profiles") as any)
     .select("tenant_id, stripe_customer_id")
     .eq("id", user.id)
     .single();
 
+  console.log("[billing/checkout] user:", user.id, "profile:", profile, "error:", profileErr);
+
   if (!profile?.tenant_id) {
-    return NextResponse.json({ error: "No tenant" }, { status: 403 });
+    return NextResponse.json({ error: "No tenant", detail: profileErr?.message }, { status: 403 });
   }
 
   const body = await request.json();
@@ -67,8 +69,8 @@ export async function POST(request: Request) {
       },
     ],
     mode: "subscription",
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings?success=true`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings?canceled=true`,
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings?success=true`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings?canceled=true`,
     metadata: {
       tenant_id: profile.tenant_id,
       user_id: user.id,
