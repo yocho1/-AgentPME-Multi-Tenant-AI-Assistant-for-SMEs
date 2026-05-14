@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { createServiceClient } from "@/lib/supabase/server";
 import Stripe from "stripe";
 
@@ -8,6 +8,7 @@ import Stripe from "stripe";
  * Handle Stripe webhook events for subscription lifecycle.
  */
 export async function POST(request: Request) {
+  const stripe = getStripe();
   const payload = await request.text();
   const signature = request.headers.get("stripe-signature") || "";
 

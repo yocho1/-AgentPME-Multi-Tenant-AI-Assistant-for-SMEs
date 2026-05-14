@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { stripe, PLANS, type PlanTier } from "@/lib/stripe";
+import { getStripe, PLANS, type PlanTier } from "@/lib/stripe";
 
 /**
  * POST /api/billing/checkout
@@ -32,6 +32,8 @@ export async function POST(request: Request) {
   if (!plan || !plan.priceId) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
+
+  const stripe = getStripe();
 
   // Get or create Stripe customer
   let customerId = profile.stripe_customer_id;

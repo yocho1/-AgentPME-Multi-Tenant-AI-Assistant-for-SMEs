@@ -1,8 +1,16 @@
 import Stripe from "stripe";
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2026-04-22.dahlia",
-});
+/**
+ * Lazy Stripe client — only instantiated server-side where env vars are available.
+ */
+export function getStripe(): Stripe {
+  if (typeof window !== "undefined") {
+    throw new Error("Stripe client is server-only");
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+    apiVersion: "2026-04-22.dahlia",
+  });
+}
 
 export const STRIPE_PRICE_IDS = {
   starter: process.env.STRIPE_PRICE_STARTER || "",
