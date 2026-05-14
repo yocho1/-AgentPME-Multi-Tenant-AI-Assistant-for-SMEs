@@ -25,7 +25,7 @@ export async function GET() {
   }
 
   const { data, error } = await (supabase.from("conversations") as any)
-    .select("id, channel, status, user_name, created_at, updated_at")
+    .select("id, channel, status, user_name, user_email, user_phone, created_at, updated_at")
     .eq("tenant_id", profile.tenant_id)
     .order("updated_at", { ascending: false })
     .limit(50);
@@ -34,5 +34,5 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data ?? []);
+  return NextResponse.json({ conversations: data ?? [] });
 }

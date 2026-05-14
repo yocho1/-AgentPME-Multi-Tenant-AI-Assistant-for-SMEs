@@ -25,6 +25,7 @@ COMMENT ON TABLE public.tenants IS 'Business workspaces (multi-tenant isolation 
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS widget_enabled BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS widget_greeting TEXT DEFAULT 'Hello! How can I help you today?';
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS widget_position TEXT NOT NULL DEFAULT 'bottom-right';
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS whatsapp_phone_id TEXT;
 -- Add check constraint separately if it doesn't exist
 DO $$ BEGIN
   IF NOT EXISTS (
@@ -100,11 +101,15 @@ CREATE TABLE IF NOT EXISTS public.conversations (
   user_name TEXT,
   user_email TEXT,
   user_phone TEXT,
+  assigned_to UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE public.conversations IS 'Customer conversations across channels';
+
+-- Add assigned_to if table already existed (backward-compatible)
+ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
 
 -- ============================================
 -- MESSAGES
