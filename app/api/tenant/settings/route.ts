@@ -15,13 +15,63 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: profile } = await (supabase.from("profiles") as any)
+  let { data: profile } = await (supabase.from("profiles") as any)
     .select("tenant_id, role")
     .eq("id", user.id)
     .single();
 
+  // Auto-create tenant + profile for existing users who signed up
+  // before the handle_new_user trigger was installed.
+  if (!profile) {
+    const tenantName =
+      user.user_metadata?.tenant_name ||
+      user.user_metadata?.full_name ||
+      (user.email ? user.email.split("@")[0] : "My Business");
+    const baseSlug = tenantName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-")
+      .replace(/-+/g, "-");
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const slug = `${baseSlug}-${randomSuffix}`;
+
+    const { data: newTenant, error: tenantErr } = await (supabase
+      .from("tenants") as any)
+      .insert({ name: tenantName, slug })
+      .select("id")
+      .single();
+
+    if (tenantErr || !newTenant) {
+      return NextResponse.json(
+        { error: "Failed to create tenant: " + tenantErr?.message },
+        { status: 500 }
+      );
+    }
+
+    const { error: profileErr } = await (supabase.from("profiles") as any)
+      .insert({
+        id: user.id,
+        tenant_id: newTenant.id,
+        role: "owner",
+        full_name:
+          user.user_metadata?.full_name ||
+          (user.email ? user.email.split("@")[0] : "User"),
+      });
+
+    if (profileErr) {
+      return NextResponse.json(
+        { error: "Failed to create profile: " + profileErr.message },
+        { status: 500 }
+      );
+    }
+
+    profile = { tenant_id: newTenant.id, role: "owner" };
+  }
+
   if (!profile?.tenant_id) {
-    return NextResponse.json({ error: "No tenant" }, { status: 403 });
+    return NextResponse.json(
+      { error: "No tenant associated with this account" },
+      { status: 403 }
+    );
   }
 
   if (!["owner", "admin"].includes(profile.role)) {
@@ -64,13 +114,63 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: profile } = await (supabase.from("profiles") as any)
+  let { data: profile } = await (supabase.from("profiles") as any)
     .select("tenant_id")
     .eq("id", user.id)
     .single();
 
+  // Auto-create tenant + profile for existing users who signed up
+  // before the handle_new_user trigger was installed.
+  if (!profile) {
+    const tenantName =
+      user.user_metadata?.tenant_name ||
+      user.user_metadata?.full_name ||
+      (user.email ? user.email.split("@")[0] : "My Business");
+    const baseSlug = tenantName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-")
+      .replace(/-+/g, "-");
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const slug = `${baseSlug}-${randomSuffix}`;
+
+    const { data: newTenant, error: tenantErr } = await (supabase
+      .from("tenants") as any)
+      .insert({ name: tenantName, slug })
+      .select("id")
+      .single();
+
+    if (tenantErr || !newTenant) {
+      return NextResponse.json(
+        { error: "Failed to create tenant: " + tenantErr?.message },
+        { status: 500 }
+      );
+    }
+
+    const { error: profileErr } = await (supabase.from("profiles") as any)
+      .insert({
+        id: user.id,
+        tenant_id: newTenant.id,
+        role: "owner",
+        full_name:
+          user.user_metadata?.full_name ||
+          (user.email ? user.email.split("@")[0] : "User"),
+      });
+
+    if (profileErr) {
+      return NextResponse.json(
+        { error: "Failed to create profile: " + profileErr.message },
+        { status: 500 }
+      );
+    }
+
+    profile = { tenant_id: newTenant.id };
+  }
+
   if (!profile?.tenant_id) {
-    return NextResponse.json({ error: "No tenant" }, { status: 403 });
+    return NextResponse.json(
+      { error: "No tenant associated with this account" },
+      { status: 403 }
+    );
   }
 
   const { data, error } = await (supabase.from("tenants") as any)
@@ -82,7 +182,7 @@ export async function GET() {
 
   if (error || !data) {
     return NextResponse.json(
-      { error: error?.message || "Not found" },
+      { error: error?.message || "Tenant not found" },
       { status: 500 }
     );
   }

@@ -93,9 +93,14 @@ export default function SettingsPage() {
 
   if (!settings) {
     return (
-      <p className="text-sm text-[var(--color-muted-foreground)]">
-        Unable to load settings.
-      </p>
+      <div className="space-y-2">
+        <p className="text-sm text-[var(--color-muted-foreground)]">
+          Unable to load settings.
+        </p>
+        {error && (
+          <p className="text-sm text-[var(--color-destructive)]">{error}</p>
+        )}
+      </div>
     );
   }
 
