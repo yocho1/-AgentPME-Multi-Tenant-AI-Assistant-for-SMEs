@@ -10,6 +10,7 @@ import {
   Users,
   LogOut,
   BookOpen,
+  BarChart3,
 } from "lucide-react";
 
 export default async function DashboardLayout({
@@ -30,6 +31,7 @@ export default async function DashboardLayout({
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/conversations", label: "Conversations", icon: MessageSquare },
     { href: "/dashboard/knowledge", label: "Knowledge", icon: BookOpen },
+    { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/dashboard/team", label: "Team", icon: Users },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
   ];
