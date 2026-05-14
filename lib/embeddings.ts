@@ -1,36 +1,22 @@
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-  defaultHeaders: {
-    "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-    "X-Title": "AgentPME",
-  },
-});
-
 /**
- * Generate embeddings for a list of text chunks via OpenRouter.
- * Default: openai/text-embedding-3-small (1536 dimensions).
+ * DEPRECATED: Embeddings now handled by FastAPI backend.
+ * Document processing routes through /api/v1/documents in FastAPI.
+ *
+ * The FastAPI backend handles:
+ * - PyMuPDF text extraction
+ * - tiktoken chunking (1000 tokens, 200 overlap)
+ * - OpenRouter embeddings (text-embedding-3-small)
+ * - pgvector storage
+ *
+ * @deprecated Use lib/fastapi-proxy.ts or direct API calls instead
  */
-export async function embedChunks(chunks: string[]): Promise<number[][]> {
-  if (!process.env.OPENROUTER_API_KEY) {
-    throw new Error("Missing OPENROUTER_API_KEY environment variable");
-  }
 
-  const response = await openai.embeddings.create({
-    model: process.env.OPENROUTER_EMBEDDING_MODEL || "openai/text-embedding-3-small",
-    input: chunks,
-    encoding_format: "float",
-  });
+console.warn("[DEPRECATED] lib/embeddings.ts is deprecated. Embeddings are handled by FastAPI.");
 
-  return response.data.map((d) => d.embedding);
+export async function embedChunks(_chunks: string[]): Promise<number[][]> {
+  throw new Error("embedChunks moved to FastAPI backend. Use lib/fastapi-proxy.ts");
 }
 
-/**
- * Generate a single embedding for a query string.
- */
-export async function embedQuery(query: string): Promise<number[]> {
-  const [embedding] = await embedChunks([query]);
-  return embedding;
+export async function embedQuery(_query: string): Promise<number[]> {
+  throw new Error("embedQuery moved to FastAPI backend. Use lib/fastapi-proxy.ts");
 }
