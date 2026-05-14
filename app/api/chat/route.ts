@@ -60,12 +60,17 @@ export async function POST(request: NextRequest) {
     conversation_id = conv?.id ?? uuidv4();
   } else {
     conversation_id = uuidv4();
-    await (supabase.from("conversations") as any).insert({
+    const { error: convErr } = await (supabase.from("conversations") as any).insert({
       id: conversation_id,
       tenant_id: tenantId,
       channel: "widget",
       status: "open",
     });
+    if (convErr) {
+      console.error("[chat] conversation insert failed:", convErr);
+    } else {
+      console.log("[chat] created conversation:", conversation_id, "tenant:", tenantId);
+    }
   }
 
   // Fetch conversation history
@@ -94,10 +99,15 @@ export async function POST(request: NextRequest) {
   }
 
   // Store messages
-  await (supabase.from("messages") as any).insert([
+  const { error: msgErr } = await (supabase.from("messages") as any).insert([
     { conversation_id, role: "user", content: message },
     { conversation_id, role: "assistant", content: reply },
   ]);
+  if (msgErr) {
+    console.error("[chat] message insert failed:", msgErr);
+  } else {
+    console.log("[chat] stored 2 messages for conversation:", conversation_id);
+  }
 
   return NextResponse.json({
     reply,

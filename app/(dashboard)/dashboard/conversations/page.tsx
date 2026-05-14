@@ -62,14 +62,17 @@ export default function ConversationsPage() {
   async function selectConversation(id: string) {
     setSelectedId(id);
     setMessages([]);
+    setError(null);
     try {
       const res = await fetch(`/api/conversations/${id}`);
       const data = await res.json();
       if (res.ok) {
         setMessages(data.messages ?? []);
+      } else {
+        setError(data.error || "Failed to load messages");
       }
     } catch {
-      // ignore
+      setError("Network error loading messages");
     }
   }
 

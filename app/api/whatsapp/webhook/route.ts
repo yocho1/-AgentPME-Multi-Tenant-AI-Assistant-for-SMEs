@@ -12,9 +12,17 @@ export async function GET(request: Request) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
+  console.log("[whatsapp/webhook] GET called");
+  console.log("  mode:", mode);
+  console.log("  token:", token);
+  console.log("  challenge:", challenge);
+  console.log("  env WHATSAPP_VERIFY_TOKEN:", process.env.WHATSAPP_VERIFY_TOKEN);
+
   if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+    console.log("[whatsapp/webhook] verification OK, returning challenge");
     return new NextResponse(challenge, { status: 200 });
   }
+  console.log("[whatsapp/webhook] verification FAILED");
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
@@ -107,9 +115,12 @@ export async function POST(request: Request) {
       content: m.content,
     }));
 
+    console.log("[whatsapp] running agent for tenant:", tenantId, "messages:", chatMessages.length);
+
     let reply: string;
     try {
       reply = await runAgent(tenantId, chatMessages);
+      console.log("[whatsapp] agent reply:", reply.substring(0, 100) + "...");
     } catch (err) {
       console.error("[whatsapp] agent failed:", err);
       reply = "Sorry, I'm having trouble right now. A human agent will assist you shortly.";

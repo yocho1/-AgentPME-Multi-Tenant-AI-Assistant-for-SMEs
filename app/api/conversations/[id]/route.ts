@@ -98,7 +98,11 @@ export async function GET(
     .eq("tenant_id", profile.tenant_id)
     .single();
 
-  if (convErr || !conversation) {
+  if (convErr) {
+    console.error("[conversations/detail] select failed:", convErr);
+    return NextResponse.json({ error: convErr.message }, { status: 500 });
+  }
+  if (!conversation) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -109,8 +113,10 @@ export async function GET(
     .order("created_at", { ascending: true });
 
   if (msgErr) {
+    console.error("[conversations/detail] messages select failed:", msgErr);
     return NextResponse.json({ error: msgErr.message }, { status: 500 });
   }
 
+  console.log("[conversations/detail] found", messages?.length ?? 0, "messages for conv", id);
   return NextResponse.json({ conversation, messages: messages ?? [] });
 }

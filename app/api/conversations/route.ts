@@ -24,6 +24,8 @@ export async function GET() {
     return NextResponse.json({ error: "No tenant" }, { status: 403 });
   }
 
+  console.log("[conversations] profile tenant_id:", profile.tenant_id);
+
   const { data, error } = await (supabase.from("conversations") as any)
     .select("id, channel, status, user_name, user_email, user_phone, created_at, updated_at")
     .eq("tenant_id", profile.tenant_id)
@@ -31,8 +33,10 @@ export async function GET() {
     .limit(50);
 
   if (error) {
+    console.error("[conversations] select failed:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  console.log("[conversations] found:", data?.length ?? 0, "for tenant:", profile.tenant_id);
   return NextResponse.json({ conversations: data ?? [] });
 }
