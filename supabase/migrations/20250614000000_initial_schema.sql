@@ -26,6 +26,8 @@ ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS widget_enabled BOOLEAN NOT N
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS widget_greeting TEXT DEFAULT 'Hello! How can I help you today?';
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS widget_position TEXT NOT NULL DEFAULT 'bottom-right';
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS whatsapp_phone_id TEXT;
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS subscription_tier TEXT;
 -- Add check constraint separately if it doesn't exist
 DO $$ BEGIN
   IF NOT EXISTS (
@@ -46,11 +48,15 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('owner', 'admin', 'agent', 'viewer')),
   full_name TEXT,
   avatar_url TEXT,
+  stripe_customer_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE public.profiles IS 'User profiles linked to tenants with RBAC';
+
+-- Add stripe_customer_id if table already existed
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
 
 -- ============================================
 -- DOCUMENTS (Knowledge Base)

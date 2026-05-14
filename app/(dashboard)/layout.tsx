@@ -11,6 +11,7 @@ import {
   LogOut,
   BookOpen,
   BarChart3,
+  CreditCard,
 } from "lucide-react";
 
 export default async function DashboardLayout({
@@ -32,6 +33,7 @@ export default async function DashboardLayout({
     { href: "/dashboard/conversations", label: "Conversations", icon: MessageSquare },
     { href: "/dashboard/knowledge", label: "Knowledge", icon: BookOpen },
     { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+    { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
     { href: "/dashboard/team", label: "Team", icon: Users },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
   ];
