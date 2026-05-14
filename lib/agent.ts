@@ -1,4 +1,4 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { StateGraph, END, START } from "@langchain/langgraph";
 import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { embedQuery } from "@/lib/embeddings";
@@ -14,12 +14,20 @@ interface AgentState {
 }
 
 // ============================================================
-// Claude LLM
+// OpenRouter LLM (OpenAI-compatible)
+// Default free model: meta-llama/llama-3.1-8b-instruct:free
 // ============================================================
-const model = new ChatAnthropic({
-  model: "claude-3-5-sonnet-20241022",
+const model = new ChatOpenAI({
+  model: process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free",
   temperature: 0.3,
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+  openAIApiKey: process.env.OPENROUTER_API_KEY,
+  configuration: {
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      "X-Title": "AgentPME",
+    },
+  },
   maxTokens: 1024,
 });
 
@@ -48,7 +56,7 @@ async function retrieveNode(state: AgentState): Promise<Partial<AgentState>> {
 }
 
 // ============================================================
-// Node: Generate response with Claude
+// Node: Generate response with OpenRouter LLM
 // ============================================================
 async function generateNode(state: AgentState): Promise<Partial<AgentState>> {
   const systemPrompt = new SystemMessage(
@@ -99,8 +107,8 @@ export async function runAgent(
   tenantId: string,
   messages: { role: "user" | "assistant" | "system"; content: string }[]
 ): Promise<string> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("Missing ANTHROPIC_API_KEY environment variable");
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error("Missing OPENROUTER_API_KEY environment variable");
   }
 
   const baseMessages: BaseMessage[] = messages.map((m) => {

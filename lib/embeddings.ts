@@ -1,20 +1,25 @@
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    "X-Title": "AgentPME",
+  },
 });
 
 /**
- * Generate embeddings for a list of text chunks using OpenAI text-embedding-3-small.
- * Returns an array of float arrays (1536 dimensions each).
+ * Generate embeddings for a list of text chunks via OpenRouter.
+ * Default: openai/text-embedding-3-small (1536 dimensions).
  */
 export async function embedChunks(chunks: string[]): Promise<number[][]> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("Missing OPENAI_API_KEY environment variable");
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error("Missing OPENROUTER_API_KEY environment variable");
   }
 
   const response = await openai.embeddings.create({
-    model: "text-embedding-3-small",
+    model: process.env.OPENROUTER_EMBEDDING_MODEL || "openai/text-embedding-3-small",
     input: chunks,
     encoding_format: "float",
   });
