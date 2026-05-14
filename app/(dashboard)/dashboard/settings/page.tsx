@@ -14,6 +14,8 @@ interface TenantSettings {
   widget_enabled: boolean;
   widget_greeting: string | null;
   widget_position: string;
+  n8n_enabled: boolean;
+  n8n_webhook_url: string | null;
 }
 
 export default function SettingsPage() {
@@ -56,6 +58,8 @@ export default function SettingsPage() {
           widget_greeting: settings.widget_greeting,
           widget_position: settings.widget_position,
           primary_color: settings.primary_color,
+          n8n_enabled: settings.n8n_enabled,
+          n8n_webhook_url: settings.n8n_webhook_url,
         }),
       });
       if (res.ok) {
@@ -182,6 +186,44 @@ export default function SettingsPage() {
                 className="w-32"
               />
             </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
+          <h2 className="text-lg font-semibold">Automations (n8n)</h2>
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            When a customer shows purchase intent (pricing, booking, etc.), fire a webhook to your n8n workflow.
+          </p>
+
+          <div className="flex items-center gap-3">
+            <input
+              id="n8n_enabled"
+              type="checkbox"
+              checked={settings.n8n_enabled}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setSettings({ ...settings, n8n_enabled: e.target.checked })
+              }
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <Label htmlFor="n8n_enabled" className="cursor-pointer">
+              Enable hot-lead detection
+            </Label>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="n8n_webhook_url">n8n Webhook URL</Label>
+            <Input
+              id="n8n_webhook_url"
+              value={settings.n8n_webhook_url || ""}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setSettings({ ...settings, n8n_webhook_url: e.target.value })
+              }
+              placeholder="https://your-n8n.app/webhook/agentpme-hot-lead"
+              disabled={!settings.n8n_enabled}
+            />
+            <p className="text-xs text-[var(--color-muted-foreground)]">
+              Payload sent: {"{"}event, conversationId, tenantId, channel, userMessage, aiResponse, detectedIntent, confidence{ "}"}
+            </p>
           </div>
         </div>
 

@@ -90,8 +90,14 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const { widget_enabled, widget_greeting, widget_position, primary_color } =
-    body;
+  const {
+    widget_enabled,
+    widget_greeting,
+    widget_position,
+    primary_color,
+    n8n_enabled,
+    n8n_webhook_url,
+  } = body;
 
   const update: Record<string, unknown> = {};
   if (typeof widget_enabled === "boolean") update.widget_enabled = widget_enabled;
@@ -99,6 +105,8 @@ export async function PATCH(request: Request) {
   if (widget_position === "bottom-right" || widget_position === "bottom-left")
     update.widget_position = widget_position;
   if (typeof primary_color === "string") update.primary_color = primary_color;
+  if (typeof n8n_enabled === "boolean") update.n8n_enabled = n8n_enabled;
+  if (typeof n8n_webhook_url === "string") update.n8n_webhook_url = n8n_webhook_url || null;
 
   const { error } = await (supabase.from("tenants") as any)
     .update(update)
@@ -197,7 +205,7 @@ export async function GET() {
 
   const { data, error } = await (supabase.from("tenants") as any)
     .select(
-      "name, slug, logo_url, primary_color, widget_enabled, widget_greeting, widget_position"
+      "name, slug, logo_url, primary_color, widget_enabled, widget_greeting, widget_position, n8n_enabled, n8n_webhook_url"
     )
     .eq("id", profile.tenant_id)
     .single();

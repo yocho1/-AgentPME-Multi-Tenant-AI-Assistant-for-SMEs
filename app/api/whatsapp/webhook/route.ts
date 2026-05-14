@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
     // Find tenant by WhatsApp phone number ID
     const { data: tenant } = await (supabase.from("tenants") as any)
-      .select("id")
+      .select("id, slug, n8n_enabled, n8n_webhook_url")
       .eq("whatsapp_phone_id", phoneNumberId)
       .single();
 
@@ -119,7 +119,14 @@ export async function POST(request: Request) {
 
     let reply: string;
     try {
-      reply = await runAgent(tenantId, chatMessages);
+      reply = await runAgent(tenantId, chatMessages, {
+        conversationId,
+        channel: "whatsapp",
+        customerPhone: fromPhone,
+        tenantSlug: tenant.slug,
+        n8nEnabled: tenant.n8n_enabled ?? false,
+        n8nWebhookUrl: tenant.n8n_webhook_url,
+      });
       console.log("[whatsapp] agent reply:", reply.substring(0, 100) + "...");
     } catch (err) {
       console.error("[whatsapp] agent failed:", err);

@@ -73,6 +73,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Fetch tenant n8n config
+  const { data: tenantConfig } = await (supabase.from("tenants") as any)
+    .select("slug, n8n_enabled, n8n_webhook_url")
+    .eq("id", tenantId)
+    .single();
+
   // Fetch conversation history
   const { data: history } = await (supabase.from("messages") as any)
     .select("role, content")
@@ -87,10 +93,16 @@ export async function POST(request: NextRequest) {
     { role: "user" as const, content: message },
   ];
 
-  // Run the agent
+  // Run the agent with n8n metadata
   let reply: string;
   try {
-    reply = await runAgent(tenantId, messages);
+    reply = await runAgent(tenantId, messages, {
+      conversationId: conversation_id,
+      channel: "widget",
+      tenantSlug: tenantConfig?.slug,
+      n8nEnabled: tenantConfig?.n8n_enabled ?? false,
+      n8nWebhookUrl: tenantConfig?.n8n_webhook_url,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Agent failed" },
