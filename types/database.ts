@@ -20,12 +20,56 @@ export type Profile = {
   updated_at: string;
 };
 
+export type Document = {
+  id: string;
+  tenant_id: string;
+  title: string;
+  content: string;
+  source: string | null;
+  status: "active" | "archived";
+  chunk_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Chunk = {
+  id: string;
+  tenant_id: string;
+  document_id: string;
+  content: string;
+  embedding: string | null; // vector serialized as string
+  chunk_index: number;
+  created_at: string;
+};
+
+export type Conversation = {
+  id: string;
+  tenant_id: string;
+  external_id: string | null;
+  channel: "widget" | "whatsapp";
+  status: "open" | "closed" | "escalated";
+  user_name: string | null;
+  user_email: string | null;
+  user_phone: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Message = {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export type TenantWithProfile = Tenant & {
   profiles: Profile[];
 };
 
-// Stub database types until Supabase CLI generates the full schema.
-// Replace this with `npx supabase gen types typescript ...` once your project is connected.
+// Supabase-generated-style Database types.
+// Replace with `npx supabase gen types typescript ...` once connected.
 export type Database = {
   public: {
     Tables: {
@@ -33,15 +77,56 @@ export type Database = {
         Row: Tenant;
         Insert: Omit<Tenant, "id" | "created_at" | "updated_at"> & { id?: string; created_at?: string; updated_at?: string };
         Update: Partial<Tenant>;
+        Relationships: never[];
       };
       profiles: {
         Row: Profile;
         Insert: Omit<Profile, "created_at" | "updated_at"> & { created_at?: string; updated_at?: string };
         Update: Partial<Profile>;
+        Relationships: never[];
+      };
+      documents: {
+        Row: Document;
+        Insert: Omit<Document, "id" | "created_at" | "updated_at" | "chunk_count"> & { id?: string; created_at?: string; updated_at?: string; chunk_count?: number };
+        Update: Partial<Document>;
+        Relationships: never[];
+      };
+      chunks: {
+        Row: Chunk;
+        Insert: Omit<Chunk, "id" | "created_at"> & { id?: string; created_at?: string };
+        Update: Partial<Chunk>;
+        Relationships: never[];
+      };
+      conversations: {
+        Row: Conversation;
+        Insert: Omit<Conversation, "id" | "created_at" | "updated_at"> & { id?: string; created_at?: string; updated_at?: string };
+        Update: Partial<Conversation>;
+        Relationships: never[];
+      };
+      messages: {
+        Row: Message;
+        Insert: Omit<Message, "id" | "created_at"> & { id?: string; created_at?: string };
+        Update: Partial<Message>;
+        Relationships: never[];
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      match_chunks: {
+        Args: {
+          query_embedding: string;
+          match_tenant_id: string;
+          match_count?: number;
+        };
+        Returns: Array<{
+          id: string;
+          document_id: string;
+          content: string;
+          chunk_index: number;
+          similarity: number;
+        }>;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

@@ -9,6 +9,7 @@ import {
   Settings,
   Users,
   LogOut,
+  BookOpen,
 } from "lucide-react";
 
 export default async function DashboardLayout({
@@ -28,6 +29,7 @@ export default async function DashboardLayout({
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/conversations", label: "Conversations", icon: MessageSquare },
+    { href: "/dashboard/knowledge", label: "Knowledge", icon: BookOpen },
     { href: "/dashboard/team", label: "Team", icon: Users },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
   ];
