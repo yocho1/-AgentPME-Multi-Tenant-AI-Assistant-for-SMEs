@@ -22,11 +22,13 @@ function getModel() {
   if (!apiKey) {
     throw new Error("Missing OPENROUTER_API_KEY environment variable");
   }
+  // apiKey MUST be inside configuration object for custom baseURL
+  // @langchain/openai v1.x ignores openAIApiKey when configuration is provided.
   return new ChatOpenAI({
     model: process.env.OPENROUTER_MODEL || "openai/gpt-3.5-turbo",
     temperature: 0.3,
-    openAIApiKey: apiKey,
     configuration: {
+      apiKey: apiKey,
       baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
         "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
